@@ -1,174 +1,45 @@
-resource "aws_s3_bucket" "input_bucket" {
-  bucket = "afi-codebuild"
-  acl    = "private"
-}
+resource "aws_cloudwatch_log_group" "code_build_log_group" {
+  name = "code_build_log_group"
 
-resource "aws_s3_bucket" "source_bucket" {
-  bucket = "afi-appbin"
-  acl    = "private"
-}
+  retention_in_days = "30"
 
-/*
-resource "aws_iam_role" "codepipeline_role" {
-  name = "codepipeline-role"
-
-  assume_role_policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "codepipeline.amazonaws.com"
-      },
-      "Action": "sts:AssumeRole"
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-        "ecr:CreateRepository"
-      ],
-      "Resource": "*"
-    }
-  ]
-}
-EOF
-}
-*/
-
-resource "aws_iam_role_policy" "codepipeline_policy" {
-  source = "github.com/traveloka/terraform-aws-bake-ami.git?ref=v2.2.4"
-  
-  name = "codepipeline_policy"
-  role = "${aws_iam_role.codepipeline_role}"
-
-  policy = <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect":"Allow",
-      "Action": [
-        "s3:GetObject",
-        "s3:GetObjectVersion",
-        "s3:GetBucketVersioning"
-      ],
-      "Resource": [
-        "${aws_s3_bucket.input_bucket.arn}",
-        "${aws_s3_bucket.input_bucket.arn}/*",
-        "${aws_s3_bucket.source_bucket.arn}",
-        "${aws_s3_bucket.source_bucket.arn}/*"
-      ]
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-        "codebuild:BatchGetBuilds",
-        "codebuild:StartBuild"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-        "ecr:BatchCheckLayerAvailability",
-        "ecr:CompleteLayerUpload",
-        "ecr:GetAuthorizationToken",
-        "ecr:InitiateLayerUpload",
-        "ecr:PutImage",
-        "ecr:UploadLayerPart"
-      ],
-      "Resource": "*"
-    }
-  ]
-}
-EOF
-}
-
-resource "aws_codebuild_project" "afi_codebuild_project" {
-  name = "afi-codebuild_project"
-  description = "afi codebuild project"
-  build_timeout = "5"
-  service_role = "${aws_iam_role.codepipeline_role.id}"
-
-  artifacts {
-    type = "NO_ARTIFACTS"
+  tags {
+    Name          = "code_build_log_group"
+    ProductDomain = "${local.product_domain}"
+    Service       = "${local.service_name}"
+    Environment   = "management"
+    Description   = "LogGroup for ${local.service_name} codebuild docker image"
+    ManagedBy     = "terraform"
   }
+}
 
-  cache {
-    type = "S3"
-    location = "${aws_s3_bucket.input_bucket.bucket}"
-  }
+===================================================
+================= Check codebuild =================
+===================================================
+
+resource "aws_codebuild_project" "codebuild_docker_image" {
+  name         = "codebuild docker image project"
+  description  = "codebuild for ${local.service_name} docker image"
+  service_role = "${local.codebuild_role_arn}"
 
   environment {
-    compute_type                = "BUILD_GENERAL1_SMALL"
-    image                       = "aws/codebuild/standard:1.0"
-    type                        = "LINUX_CONTAINER"
-    image_pull_credentials_type = "CODEBUILD"
-
-    environment_variable {
-      name  = "AWS_DEFAULT_REGION"
-      value = "ap-southeast-1"
-    }
-
-    environment_variable {
-      name  = "IMAGE_REPO_NAME"
-      value = "517530806209.dkr.ecr.ap-southeast-1.amazonaws.com/aprafsa-docker-image"
-    }
-
-     environment_variable {
-      name  = "IMAGE_TAG"
-      value = "latest"
-    }
+    compute_type = "BUILD_GENERAL1_LARGE" # 15 GB memory, 8 vCPUs
+    image        = "aws/codebuild/standard:2.0-1.9.0"
+    type         = "LINUX_CONTAINER"
   }
 
   source {
-    type            = "S3"
-    location        = "afi-codebuild/aprafsa-codebuild.zip"
+    type      = "GITHUB"
+    location = "https://github.com/traveloka/afi-product-java"
+    git_clone_depth = 1
   }
 
-} 
-
-
-# https://github.com/traveloka/terraform-aws-bake-ami/blob/master/main.tf#L53
-# Refer to this aprafsa codebuild terraform
-
-resource "aws_codepipeline" "afi_docker_codepipeline" {
-  name     = "afi_docker_codepipeline"
-  role_arn = "${var.codepipeline_role_arn}"
-
-  artifact_store {
-    location = "${var.codepipeline_artifact_bucket}"
-    type     = "S3"
-  }
-
-  stage {
-    name = "Build"
-
-    action {
-      name             = "Bake"
-      category         = "Build"
-      owner            = "AWS"
-      provider         = "CodeBuild" 
-      version          = "1"
-
-      configuration {
-        ProjectName = "${local.afi_codebuild_project}"
-      }
-
-      run_order = "1"
-    }
-  } 
-  /*
   tags {
-    "Name"          = "${local.pipeline_name}"
-    "Description"   = "${var.service_name} AMI Baking Pipeline"
-    "Service"       = "${var.service_name}"
-    "ProductDomain" = "${var.product_domain}"
+    "Name"          = "${local.service_name}"
+    "Description"   = "Build ${local.service_name} Docker Iamge"
+    "Service"       = "${local.service_name}"
+    "ProductDomain" = "${local.product_domain}"
     "Environment"   = "management"
     "ManagedBy"     = "terraform"
   }
-  */
 }
-
- 
