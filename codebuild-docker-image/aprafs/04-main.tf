@@ -13,14 +13,18 @@ resource "aws_cloudwatch_log_group" "code_build_log_group" {
   }
 }
 
-===================================================
-================= Check codebuild =================
-===================================================
+##########################################################
+#################### Check codebuild #####################
+##########################################################
 
 resource "aws_codebuild_project" "codebuild_docker_image" {
-  name         = "codebuild docker image project"
+  name         = "codebuild_docker_image_project"
   description  = "codebuild for ${local.service_name} docker image"
   service_role = "${local.codebuild_role_arn}"
+
+  artifacts {
+    type           = "NO_ARTIFACTS"
+  }
 
   environment {
     compute_type = "BUILD_GENERAL1_LARGE" # 15 GB memory, 8 vCPUs
@@ -30,7 +34,7 @@ resource "aws_codebuild_project" "codebuild_docker_image" {
 
   source {
     type      = "GITHUB"
-    location = "https://github.com/traveloka/afi-product-java"
+    location = "${local.source_code_repo}" # "https://github.com/traveloka/afi-product-java"
     git_clone_depth = 1
   }
 

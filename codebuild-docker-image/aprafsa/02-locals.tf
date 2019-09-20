@@ -4,6 +4,7 @@ locals {
   codebuild_role_arn   = "arn:aws:iam::517530806209:role/service-role/codebuild.amazonaws.com/ServiceRoleForCodebuild_apr-container-d2696dc94ba05be7"
   codebuild_role_name  = "ServiceRoleForCodebuild_apr-container-d2696dc94ba05be7"
   code_repo      =  "accom-affiliate-search-application-service" # "hotel:accom-affiliate-search-application-service"
+  source_code_repo     = "https://github.com/traveloka/afi-product-java"
 
   buildspec = <<EOF
 version: 0.2
